@@ -28,6 +28,24 @@ public class SimpleThreads {
         }
     }
 
+    private static class CpuIntensiveLoop implements Runnable {
+        public void run() {
+            long count = 0;
+            double dummyResult = 0;
+            
+            while (!Thread.currentThread().isInterrupted()) {
+                dummyResult += Math.sqrt(count);
+                count++;
+                
+                if (count % 500_000_000L == 0) {
+                    threadMessage("Processando... (Iteração: " + count + ")");
+                }
+            }
+            
+            threadMessage("Thread interrompida " + count);
+        }
+    }
+
     public static void main(String args[])
         throws InterruptedException {
 
@@ -46,24 +64,26 @@ public class SimpleThreads {
 
         threadMessage("Starting MessageLoop thread");
         long startTime = System.currentTimeMillis();
-        Thread t = new Thread(new MessageLoop());
+        Thread t = new Thread(new MessageLoop(), "Thread-Mensagens");
+        Thread t2 = new Thread(new CpuIntensiveLoop(), "Thread-CPU");
 
-	// Put the MessageLoop thread to run
         t.start();
-
-        threadMessage("Waiting for MessageLoop thread to finish");
-	
-        // loop until MessageLoop thread exits
-        while (t.isAlive()) {
+        t2.start();
+	// Put the MessageLoop thread to run
+        while (t.isAlive() || t2.isAlive()) {
             threadMessage("Still waiting...");
-            // Wait maximum of 1 second for MessageLoop thread to finish
-            t.join(1000);
-            if (((System.currentTimeMillis() - startTime) > patience) && t.isAlive()) {
+            Thread.sleep(1000); 
+            
+            long tempoDecorrido = System.currentTimeMillis() - startTime;
+            
+            if (tempoDecorrido > patience) {
                 threadMessage("Tired of waiting!");
-		// Force the interruption of the MainLoop thread
-                t.interrupt();
-                // ...and wait for it to finish -- shouldn't be long now 
+                
+                if (t.isAlive()) t.interrupt();
+                if (t2.isAlive()) t2.interrupt();
+                
                 t.join();
+                t2.join();
             }
         }
         threadMessage("Finally!");
